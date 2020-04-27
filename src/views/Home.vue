@@ -1,5 +1,8 @@
 <template>
   <div class="home">
+    <div class="loading" v-if="showLoading">
+      <img src="../assets/loading.svg">
+    </div>
     <HomeLink></HomeLink>
 
     <div class="personalized">
@@ -11,6 +14,9 @@
 
     <div class="newsong">
       <CardTitle>推荐音乐</CardTitle>
+      <ul>
+        <SongItem v-for="(item,index) in newsongs" :key="index" :songItem="item" @translate-song-id="$emit('tanslate-song-id',$event)"></SongItem>
+      </ul>
     </div>
   </div>
 </template>
@@ -21,19 +27,22 @@
 import CardTitle from "@/components/CardTitle.vue";
 import SongListCard from "@/components/SongListCard.vue";
 import HomeLink from "@/components/HomeLink.vue";
+import SongItem from "@/components/SongItem.vue";
 export default {
   name: "Home",
   data: function() {
     return {
       personalizeds: [],
-      newsongs: []
+      newsongs: [],
+      showLoading:false
     };
   },
   components: {
     // HelloWorld
     CardTitle,
     SongListCard,
-    HomeLink
+    HomeLink,
+    SongItem
   },
   methods: {
     // 获取推荐歌单
@@ -58,7 +67,27 @@ export default {
           console.log(error);
         });
     },
-    getNewSong: function() {},
+    getNewSong: function() {
+      this.axios
+        .get("/personalized/newsong")
+        .then(response => {
+          // 如果数据正确
+          // console.log(response);
+          this.newsongs = response.data.result;
+          // 获取到的数据放入本地存储
+          window.localStorage.setItem(
+            "newsongs",
+            // 过期时间1小时
+            JSON.stringify({
+              expire: Date.now() + 1 * 60 * 60 * 1000,
+              result: response.data.result
+            })
+          );
+        })
+        .catch(function(error) {
+          console.log(error);
+        });
+    },
     // 随机取六个推荐歌单
     randomPersonalizeds: function() {
       // 截取前六个
@@ -86,6 +115,26 @@ export default {
       // 已经过期
       this.getPersonalized();
     }
+
+    const cacheNewsongs  = JSON.parse(
+      window.localStorage.getItem("newsongs")
+    );
+    if (cacheNewsongs && cacheNewsongs.expire > Date.now()) {
+      // 存在并且还没有过期
+      this.newsongs = cacheNewsongs.result;
+    } else {
+      // 已经过期
+      this.getNewSong();
+    }
+  },
+  beforeRouteEnter (to, from, next) {
+    next(vm=>{
+      vm.showLoading = false;
+    })
+  },
+  beforeRouteLeave (to, from, next) {
+    this.showLoading = true;
+    next();
   }
 };
 </script>
@@ -94,5 +143,23 @@ export default {
 .songlist {
   display: flex;
   flex-wrap: wrap;
+}
+.home {
+  position: relative;
+}
+.loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+  img {
+    width: 36px;
+  }
 }
 </style>
